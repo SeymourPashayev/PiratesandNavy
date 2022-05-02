@@ -1,0 +1,773 @@
+
+<!doctype html>
+<meta charset="utf-8">
+<title>Pirates & Navy</title>
+
+<style>
+    
+{
+padding: 0px;
+margin: 0px;myste
+}
+    
+/*size of the ocean (playing board)*/
+#ocean
+{
+    position: relative;
+    width: 896px;
+    height: 768px;
+    margin: 10px;
+    background-image: url("../images/oceanbluelarge.jpg");
+}
+/*size of each cell on the ocean*/
+.cell
+{
+    display: block;
+    position: absolute;
+    width: 128px;
+    height :128px;
+}
+/*size of the the ocean*/
+p
+{
+    width: 1024px;
+}
+
+    
+</style>
+
+
+<div id="ocean"></div>
+<p id="output"></p>
+
+<button id='replay' onclick='replay()' >Reset</button>
+
+<script>
+    
+//Set up sounds
+function playAudio(url) {
+    new Audio(url).play();
+}
+    
+//Get a reference to the ocean and output
+var ocean = document.querySelector("#ocean");
+var output = document.querySelector("#output");
+
+//Keyboard listener for user to manipulate ship
+window.addEventListener("keydown", keydownHandler, false);
+
+var map = mapGenerator();
+
+//Placing the various game objects on the Map
+var gameObjects =
+[
+[0, 0, 0, 0, 0, 0, 0],
+[0, 0, 0, 0, 0, 0, 0],
+[0, 0, 0, 0, 0, 0, 0],
+[0, 0, 0, 0, 0, 0, 0],
+[0, 0, 0, 0, 0, 0, 0],
+[4, 0, 0, 0, 0, 0, 0]
+];
+
+
+// Random start location for the monster
+var monsterRandStartLocRow = Math.ceil(Math.random()*5);
+var monsterRandStartLocCol = Math.ceil(Math.random()*6);
+gameObjects[monsterRandStartLocRow][monsterRandStartLocCol] = 5;
+
+// Random start location for hurricane
+var hurricaneRandStartLocRow = Math.ceil(Math.random()*5);
+var hurricaneRandStartLocCol = Math.ceil(Math.random()*6);
+// Random chance of having or not having the hurricane on the map
+var hurricaneExists = Math.random() > 0.6;
+if (hurricaneExists){
+    gameObjects[hurricaneRandStartLocRow][hurricaneRandStartLocCol] = 8;
+}
+
+//Map code
+var water = 0;
+var island = 1;
+var pirate = 2;
+var home = 3;
+var ship = 4;
+var monster = 5;
+var pirateIsland = 6;
+var mysteryIsland = 7;
+var hurricane = 8;
+
+//The size of each cell
+var size = 128;
+
+//The number of rows and columns
+var rows = map.length;
+var columns = map[0].length;
+
+//Arrow key codes
+var up = 38;
+var down = 40;
+var right = 39;
+var left = 37;
+
+// Set the ship's start position
+var shipRow;
+var shipColumn;
+
+// Monster's start position
+var monsterRow;
+var monsterColumn;
+
+// Hurricane's start position
+var hurricaneRow;
+var hurricaneColumn;
+
+// Plow through the map and set the locations for interactive elements
+setObjectLocations();
+
+// function to set object locations
+function setObjectLocations(){
+    for(var row = 0; row < rows; row++){
+        for(var column = 0; column < columns; column++){
+            // Set the ship location
+            if(gameObjects[row][column] == ship){
+                shipRow = row;
+                shipColumn = column;
+            }
+            
+            // Set the monster location
+            if(gameObjects[row][column] == monster){
+                monsterRow = row;
+                monsterColumn = column;
+            }
+            
+            // Set the hurricane location
+            if(gameObjects[row][column] == hurricane){
+                hurricaneRow = row;
+                hurricaneColumn = column;
+            }
+        }
+    }
+}
+
+    
+
+//The game variables
+var food = 11;
+var gold = 10;
+var experience = 0;
+var gameMessage = "Use arrow keys to sail home and avoid the monster. Reload page to re-play.";
+
+//FIXME: Make a replay option, not have to use reload
+
+//will clear the ocean map from previous turns
+render();
+
+function mapGenerator(){
+    // Items still left to place on the map
+    numPirateShipsLeft = 3; // case 1
+    numIslands = 3;         // case 2
+    numPirateIslands = 2;   // case 3
+    numMisteryIslands = 1;  // case 4
+    
+    // function to pick what items to place on a selected map tile
+    function pickItemToPlace(){
+        var itemNum = Math.ceil(Math.random()*4);
+        switch(itemNum){
+            case 1:
+                if (numPirateShipsLeft > 0){
+                    numPirateShipsLeft--;
+                    return 2;
+                }
+            
+            case 2:
+                if (numIslands > 0){
+                    numIslands--;
+                    return 1;
+                }
+            
+            case 3:
+                if (numPirateIslands > 0){
+                    numPirateIslands--;
+                    return 6;
+                }
+            
+            case 4:
+                if (numMisteryIslands > 0){
+                    numMisteryIslands--;
+                    return 7;
+                }
+            return 0;
+        }
+    }
+    
+    // Map template
+currMap =
+    [
+     [0, 0, 0, 0, 0, 0, 3],
+     [0, 0, 0, 0, 0, 0, 0],
+     [0, 0, 0, 0, 0, 0, 0],
+     [0, 0, 0, 0, 0, 0, 0],
+     [0, 0, 0, 0, 0, 0, 0],
+     [0, 0, 0, 0, 0, 0, 0]
+    ];
+    
+    // Procedure to position the items on the map
+    for(row in currMap){
+        for(col in currMap[row]){
+            // chance variable to determine wether the current space is going to be filled
+            var chance = Math.random() > 0.75;
+            //console.log(chance)
+            if (chance) {
+                currMap[row][col] = pickItemToPlace();
+            }
+        }
+    }
+    
+    // make sure home port always exists
+    currMap[0][6] = 3;
+    
+    // return the map
+    return currMap;
+}
+
+// Event handler for keyboard presses
+function keydownHandler(event){
+    switch(event.keyCode){
+        
+        case up:
+        //determine if the ship's move will be within the playing field
+        if(shipRow > 0){
+            //if so, clear ship's current cell
+            gameObjects[shipRow][shipColumn] = 0;
+            //subract 1 from the ship's row to move it up one row on the map
+            shipRow--;
+            //apply the ship's new updated position to the array
+            gameObjects[shipRow][shipColumn] = ship;
+        }
+            break;
+        
+        case down:
+        if(shipRow < rows - 1){
+            gameObjects[shipRow][shipColumn] = 0;
+            shipRow++;
+            gameObjects[shipRow][shipColumn] = ship;
+        }
+            break;
+        
+        case left:
+        if(shipColumn > 0){
+            gameObjects[shipRow][shipColumn] = 0;
+            shipColumn--;
+            gameObjects[shipRow][shipColumn] = ship;
+        }
+            break;
+        
+        case right:
+        if(shipColumn < columns - 1){
+            gameObjects[shipRow][shipColumn] = 0;
+            shipColumn++;
+            gameObjects[shipRow][shipColumn] = ship;
+        }
+            break;
+    }
+    
+    
+//find out what kind of cell the ship is on
+switch(map[shipRow][shipColumn]){
+    case water:
+        //console.log("water");
+        gameMessage = "You sail the open seas."
+        break;
+        
+    case pirate:
+        //console.log("pirate");
+        fight();
+        break;
+        
+    case pirateIsland:
+        //console.log("pirate island");
+        pirateIslandFight();
+        break;
+        
+    case mysteryIsland:
+        //console.log("mystery island");
+        pirateIslandFight();
+        break;
+        
+    case island:
+        //console.log("trade island");
+        trade();
+        break;
+        
+    case home:
+        //console.log("Home: end-game");
+        endGame();
+        break;
+        
+    case hurricane:
+        //console.log("Hurricane");
+        endGame();
+        break;
+}
+
+// Move the monster & the hurricane if that exists
+moveMonster();
+if (hurricaneExists) {
+    moveHurricane();
+}
+
+// Game over if the monster or hurricane touches the ship
+if(gameObjects[shipRow][shipColumn] === monster || gameObjects[shipRow][shipColumn] === hurricane){
+    endGame();
+}
+
+// Subtract some food each turn
+food--;
+// Game over if the ship is out of gold or food
+if(food <= 0 || gold <= 0){
+    endGame();
+}
+
+//Render the game
+render();
+}
+
+// MoveMonster function
+function moveMonster(){
+    //The 4 possible directions that the monster can move
+    var UP = 38;
+    var DOWN = 40;
+    var RIGHT = 39;
+    var LEFT = 37;
+
+    //An array to store the valid direction that
+    //the monster is allowed to move in
+    var validDirections = [];
+
+    //The final direction that the monster will move in
+    var direction = undefined;
+
+    //Find out what kinds of things are in the cells
+    //that surround the monster. If the cells contain water,
+    //push the corresponding direction into the validDirections array
+    if(monsterRow > 0) {
+        var thingAbove = map[monsterRow - 1][monsterColumn];
+        if(thingAbove === water) {
+            validDirections.push(UP);
+        }
+    }
+    
+    if(monsterRow < rows - 1) {
+        var thingBelow = map[monsterRow + 1][monsterColumn];
+        if(thingBelow === water) {
+            validDirections.push(DOWN);
+        }
+    }
+    
+    if(monsterColumn > 0) {
+        var thingToTheLeft = map[monsterRow][monsterColumn - 1];
+        if(thingToTheLeft === water) {
+            validDirections.push(LEFT);
+        }
+    }
+    
+    if(monsterColumn < columns - 1) {
+        var thingToTheRight = map[monsterRow][monsterColumn + 1];
+        if(thingToTheRight === water) {
+            validDirections.push(RIGHT);
+        }
+    }
+
+//The validDirections array now contains 0 to 4 directions that
+//contain water cells. Which of those directions will the monster
+//choose to move in?
+
+//If a valid direction was found, Randomly choose one of the
+//possible directions and assign it to the direction variable
+if(validDirections.length !== 0) {
+    var randomNumber = Math.floor(Math.random() * validDirections.length);
+    direction = validDirections[randomNumber];
+}
+
+//Move the monster in the chosen direction
+switch(direction) {
+    case UP:
+        //Clear the monster's current cell
+        gameObjects[monsterRow][monsterColumn] = 0;
+        //Subtract 1 from the monster's row
+        monsterRow--;
+        //Apply the monster's new updated position to the array
+        gameObjects[monsterRow][monsterColumn] = monster;
+        break;
+
+    case DOWN:
+        gameObjects[monsterRow][monsterColumn] = 0;
+        monsterRow++;
+        gameObjects[monsterRow][monsterColumn] = monster;
+        break;
+
+    case LEFT:
+        gameObjects[monsterRow][monsterColumn] = 0;
+        monsterColumn--;
+        gameObjects[monsterRow][monsterColumn] = monster;
+        break;
+
+    case RIGHT:
+        gameObjects[monsterRow][monsterColumn] = 0;
+        monsterColumn++;
+        gameObjects[monsterRow][monsterColumn] = monster;
+    }
+}// ENDOF: MoveMonster
+    
+// Move Hurricane Function
+function moveHurricane(){
+    //The 4 possible directions that the hurricane can move
+    var UP = 38;
+    var DOWN = 40;
+    var RIGHT = 39;
+    var LEFT = 37;
+
+    //An array to store the valid direction that
+    //the hurricane is allowed to move in
+    var validDirections = [];
+
+    //The final direction that the hurricane will move in
+    var direction = undefined;
+
+    //Find out what kinds of things are in the cells
+    //that surround the hurricane. If the cells contain water,
+    //push the corresponding direction into the validDirections array
+    if(hurricaneRow > 0) {
+        var thingAbove = map[hurricaneRow - 1][hurricaneColumn];
+        if(thingAbove === water) {
+            validDirections.push(UP);
+        }
+    }
+    
+    if(hurricaneRow < rows - 1) {
+        var thingBelow = map[hurricaneRow + 1][hurricaneColumn];
+        if(thingBelow === water) {
+            validDirections.push(DOWN);
+        }
+    }
+    
+    if(hurricaneColumn > 0) {
+        var thingToTheLeft = map[hurricaneRow][hurricaneColumn - 1];
+        if(thingToTheLeft === water) {
+            validDirections.push(LEFT);
+        }
+    }
+    
+    if(hurricaneColumn < columns - 1) {
+        var thingToTheRight = map[hurricaneRow][hurricaneColumn + 1];
+        if(thingToTheRight === water) {
+            validDirections.push(RIGHT);
+        }
+    }
+
+//The validDirections array now contains 0 to 4 directions that
+//contain water cells. Which of those directions will the hurricane move in?
+
+//If a valid direction was found, Randomly choose one of the
+//possible directions and assign it to the direction variable
+if(validDirections.length !== 0) {
+    var randomNumber = Math.floor(Math.random() * validDirections.length);
+    direction = validDirections[randomNumber];
+}
+
+//Move the hurricane in the chosen direction
+switch(direction) {
+    case UP:
+        //Clear the hurricane's current cell
+        gameObjects[hurricaneRow][hurricaneColumn] = 0;
+        //Subtract 1 from the hurricane's row
+        hurricaneRow--;
+        //Apply the hurricane's new updated position to the array
+        gameObjects[hurricaneRow][hurricaneColumn] = hurricane;
+        break;
+
+    case DOWN:
+        gameObjects[hurricaneRow][hurricaneColumn] = 0;
+        hurricaneRow++;
+        gameObjects[hurricaneRow][hurricaneColumn] = hurricane;
+        break;
+
+    case LEFT:
+        gameObjects[hurricaneRow][hurricaneColumn] = 0;
+        hurricaneColumn--;
+        gameObjects[hurricaneRow][hurricaneColumn] = hurricane;
+        break;
+
+    case RIGHT:
+        gameObjects[hurricaneRow][hurricaneColumn] = 0;
+        hurricaneColumn++;
+        gameObjects[hurricaneRow][hurricaneColumn] = hurricane;
+    }
+} // ENDOF: moveHurricane
+    
+// Trade function
+function trade(){
+    //Figure out how much food the island has
+    //and how much it should cost
+    var newFood = experience + gold;
+    var cost = Math.ceil(Math.random() * newFood);
+
+    //Let the player buy food if there's enough gold
+    //to afford it and increment experience
+    if(gold > cost) {
+        gold -= cost;
+        food += newFood;
+
+        gameMessage = "You buy " + newFood + " coconuts" + " for " + cost + " gold pieces."
+    } else {
+        //Tell the player if they don't have enough gold
+        experience += 1;
+        gameMessage = "Mismanager! We don't have enough gold to buy food."
+    }
+}// ENDOF: Trade
+    
+// Fight function
+function fight(){
+    
+    //The ships strength
+    var shipStrength = Math.ceil((food + gold) / 2);
+
+    //A random number between 1 and the ship's strength
+    var pirateStrength = Math.ceil(Math.random() * shipStrength * 2);
+
+    if(pirateStrength > shipStrength) {
+        playAudio('lost2.mp3');
+        //The pirates ransack the ship
+        var stolenGold = Math.round(pirateStrength / 2);
+        gold -= stolenGold;
+
+        //Give the player some experience for trying
+        experience += 1;
+
+        //Update the game message
+        gameMessage
+        = "You fight and lose " + stolenGold + " gold pieces."
+        + " <br>Ship's strength: " + shipStrength
+        + " <br>Pirate's strength: " + pirateStrength;
+    } else{
+        playAudio('fight.mp3');
+        
+        //You win the pirates' gold
+        var pirateGold = Math.round(pirateStrength / 2);
+        gold += pirateGold;
+
+        //Add some experience
+        experience += 2;
+
+        //Update the game message
+        gameMessage
+        = "You fight and win " + pirateGold + " gold pieces."
+        + " <br>Ship's strength: " + shipStrength
+        + " <br>Pirate's strength: " + pirateStrength;
+    }
+} // ENDOF: Fight
+    
+// Pirate Island Fight Function
+function pirateIslandFight() {
+    
+    //The ships strength
+    var shipStrength = Math.ceil((food + gold) / 2);
+
+    //A random number between 1 and the ship's strength
+    var pirateStrength = Math.ceil(Math.random() * shipStrength * 2);
+
+    if(pirateStrength > shipStrength){
+        playAudio('lost.mp3');
+        //The pirates ransack the ship and steal some of the gold
+        var stolenGold = Math.round(pirateStrength / 2);
+        gold -= stolenGold;
+
+        //Give the player some experience for trying
+        experience += 1;
+
+        //Update the game message
+        gameMessage
+        = "You get malaria and lose " + stolenGold + " gold pieces."
+        + " <br>Ship's strength: " + shipStrength
+        + " <br>Pirate's strength: " + pirateStrength;
+    } else{
+        playAudio('fight.mp3');
+        //You win the pirates' gold
+        var pirateGold = Math.round(pirateStrength / 2);
+        gold += pirateGold;
+
+        //Add some experience
+        experience += 2;
+
+        //Update the game message
+        gameMessage
+        = "You discover " + pirateGold + " gold pieces."
+        + " <br>Ship's strength: " + shipStrength
+        + " <br>Pirate's strength: " + pirateStrength;
+    }
+} // ENDOF: pirateIslandFight
+    
+// EndGame function
+function endGame() {
+    
+    if(map[shipRow][shipColumn] === home) {
+        //Calculate the score
+        var score = food + gold + experience;
+
+        //Display the game message
+        gameMessage
+        = "<strong>You made it home alive! " + "Final Score: " + score;
+        playAudio('mysound.mp3')
+    } else if(gameObjects[shipRow][shipColumn] === monster){
+        gameMessage
+        = "Your ship has been swallowed by a sea monster!";
+        playAudio('monster.mp3')
+    } else if(gameObjects[shipRow][shipColumn] === hurricane){
+        gameMessage
+        = "Your ship has been destroyed by a hurricane";
+        playAudio('hurricane.mp3')
+    } else{
+        //Display the game message
+        if(gold <= 0) {
+            gameMessage += " <br>You've run out of gold!";
+            gameMessage
+            += " <br><strong>Mutiny: your crew makes you walk the plank while hurling expletives!";
+            playAudio('bye-bye-cap.mp3')
+        } else {
+            gameMessage += " <br>You've run out of food and your crew ate you alive!";
+            playAudio('scream2.mp3')
+        }
+        
+    }
+
+    //Remove the keyboard listener to end the game
+    window.removeEventListener("keydown", keydownHandler, false);
+}// ENDOF: endGame
+ 
+// Function to be able to replay the game
+function replay(){
+    // reset the game variables
+    food = 11;
+    gold = 10;
+    experience = 0;
+    gameMessage = "Use arrow keys to sail home and avoid the monster. Reload page to re-play.";
+    
+    map = mapGenerator();
+
+    //Placing the various game objects on the Map
+    gameObjects =
+    [
+    [0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0],
+    [4, 0, 0, 0, 0, 0, 0]
+    ];
+
+
+    // Random start location for the monster
+    monsterRandStartLocRow = Math.ceil(Math.random()*5);
+    monsterRandStartLocCol = Math.ceil(Math.random()*6);
+    gameObjects[monsterRandStartLocRow][monsterRandStartLocCol] = 5;
+
+    // Random start location for hurricane
+    hurricaneRandStartLocRow = Math.ceil(Math.random()*5);
+    hurricaneRandStartLocCol = Math.ceil(Math.random()*6);
+    // Random chance of having or not having the hurricane on the map
+    hurricaneExists = Math.random() > 0.6;
+    if (hurricaneExists){
+        gameObjects[hurricaneRandStartLocRow][hurricaneRandStartLocCol] = 8;
+    }
+    
+    // set the objects' location
+    setObjectLocations();
+    
+    // render the game
+    render();
+    
+    //Keyboard listener for user to manipulate ship
+    window.addEventListener("keydown", keydownHandler, false);
+    
+} //ENDOF: Replay;
+    
+function render(){
+    //Clear the ocean of img cells
+    //from the previous turn
+    if(ocean.hasChildNodes()){
+        for(var i = 0; i < rows * columns; i++){
+            ocean.removeChild(ocean.firstChild);
+        }
+    }
+
+    //Render the game by looping through the map arrays
+    for(var row = 0; row < rows; row++){
+        for(var column = 0; column < columns; column++){
+            //Create an image tag called cell
+            var cell = document.createElement("img");
+
+            //Set the CSS class to "cell"
+            cell.setAttribute("class", "cell");
+
+            //Add the img tag to the <div id="ocean"> tag
+            ocean.appendChild(cell);
+
+            //Find the correct image for this map cell
+            switch(map[row][column]){
+            case water:
+                cell.src = "../images/water.png";
+                break;
+
+            case island:
+                cell.src = "../images/desertIsland.png";
+                break;
+
+            case pirate:
+                cell.src = "../images/pirateship.png";
+                break;
+
+            case home:
+                cell.src = "../images/home.png";
+                break;
+            
+            case pirateIsland:
+                cell.src = "../images/desertIsland.png";
+                break;
+            
+            case mysteryIsland:
+                cell.src = "../images/mysteryIsland.png";
+                break;
+            }
+            
+        //Add the ship from the gameObjects array
+        switch(gameObjects[row][column]){
+            case ship:
+                cell.src = "../images/shipBritish.png";
+                break;
+                
+            case monster:
+                cell.src = "../images/seaMonster.png";
+                break;
+                
+                
+            case hurricane:
+                cell.src = "../images/hurricane.png";
+                break;
+        }
+            
+            
+            //Position the cell
+            cell.style.top = row * size + "px";
+            cell.style.left = column * size + "px";
+            }
+        }
+
+        //Display the game message
+        output.innerHTML = gameMessage;
+
+        //Display the player's food, gold, and experience
+        output.innerHTML += "<br><strong>Ship's Store</strong>: Gold: " + gold + ", Food: " + food + ", Experience: " + experience;
+}
+
+</script>
+
+
